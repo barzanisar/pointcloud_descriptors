@@ -283,7 +283,7 @@ def check_feat_robustness(points, method, reject_infinite_normal_objs):
     plt.legend()
     plt.show()
 
-def extract_all_feats(dbinfos, method, reject_infinite_normal_objs, class_names):
+def extract_all_feats(dbinfos, method, reject_infinite_normal_objs, class_names, root_path):
     obj_class_idx = []
     desc_mat = []
     valid_info_idx = [] 
@@ -291,7 +291,7 @@ def extract_all_feats(dbinfos, method, reject_infinite_normal_objs, class_names)
     for class_idx, class_name in enumerate(class_names):
         count_valid = 0
         for i, info in tqdm(enumerate(dbinfos[class_name])):
-            path = '/home/barza/OpenPCDet/data/waymo/' + info['path']
+            path = root_path + info['path']
             obj_points = np.fromfile(str(path), dtype=np.float32).reshape([-1, 5])
             if len(obj_points) > 5:
                 # print(f'Computing vfh: {class_names} {i}')
@@ -313,138 +313,131 @@ def extract_all_feats(dbinfos, method, reject_infinite_normal_objs, class_names)
                  'valid_info_idx': valid_info_idx}
 
     pickle.dump(data_dict, open(f"{method}_feats_data_dict.pkl", "wb"))
+    print(f'Saved {method}_feats_data_dict.pkl')
 
-    tsne = TSNE(n_components=2).fit_transform(desc_mat) #N obj, 308 feature vector
+    # tsne = TSNE(n_components=2).fit_transform(desc_mat) #N obj, 308 feature vector
 
-    pickle.dump(tsne, open(f"{method}_tsne.pkl", "wb"))
-
-# def get_infos(split, frame_sampling_interval):
-#     split_txt_file = f'/home/barza/DepthContrast/data/waymo/ImageSets/{split}.txt'
-#     seq_list = [x.strip().split('.')[0] for x in open(split_txt_file).readlines()]
-#     data_root_path = Path('/home/barza/DepthContrast/data/waymo/waymo_processed_data_v_1_2_0')
-
-#     waymo_infos = []
-#     for seq_name in seq_list:
-#         seq_info_path = data_root_path / seq_name /  ('%s.pkl' % seq_name)
-#         with open(seq_info_path, 'rb') as f:
-#             infos = pickle.load(f) # loads 20 infos for one seq pkl i.e. 20 frames if seq pkl was formed by sampling every 10th frame
-#             waymo_infos.extend(infos) # each info is one frame
-
-#     if frame_sampling_interval > 1:
-#             sampled_waymo_infos = []
-#             for k in range(0, len(waymo_infos), frame_sampling_interval):
-#                 sampled_waymo_infos.append(waymo_infos[k])
-#             waymo_infos = sampled_waymo_infos
-#             print('Total sampled samples(frames) for Waymo dataset: %d' % len(waymo_infos))
-    
-#     return waymo_infos
-
-# def get_lidar(sequence_name, sample_idx):
-#         lidar_file = Path('/home/barza/DepthContrast/data/waymo/waymo_processed_data_v_1_2_0') / sequence_name / ('%04d.npy' % sample_idx)
-#         point_features = np.load(lidar_file)  # (N, 7): [x, y, z, intensity, elongation, NLZ_flag]
-
-#         points_all = point_features[:, 0:4] #points_all: x,y,z,i, skip elongation
-#         points_all[:, 3] = np.tanh(points_all[:, 3]) * 255.0  #TODO:
-#         return points_all #only get xyzi
+    # pickle.dump(tsne, open(f"{method}_tsne.pkl", "wb"))
+    # print(f'Saved {method}_tsne.pkl')
 
 
 if __name__ == "__main__":
 
-    # frame_sampling_interval = 5
-    # infos = get_infos('train_short', frame_sampling_interval)
-
-    # X, y=[], []
-    # for info in infos:
-    #     pc_info = info['point_cloud']
-    #     sequence_name = pc_info['lidar_sequence']
-    #     sample_idx = pc_info['sample_idx']
-    #     frame_id = info['frame_id']
-
-    #     points = get_lidar(sequence_name, sample_idx)
-
-    #     for lbl in np.unique(pt_seg_labels):
-    #         if lbl == 0:
-    #             continue
-    #         obj_pts = points[pt_seg_labels==lbl]
-
     #path = '/home/barza/DepthContrast/data/waymo/waymo_processed_data_10_short_waymo_dbinfos_train_sampled_1.pkl'
-    path = '/home/barza/OpenPCDet/data/waymo/waymo_processed_data_v_1_2_0_waymo_dbinfos_train_sampled_100.pkl'
+    ROOT_PATH = '/home/barza/OpenPCDet/data/waymo/'
+    path = ROOT_PATH + 'waymo_processed_data_v_1_2_0_waymo_dbinfos_train_sampled_100.pkl'
     with open(path, 'rb') as f:
         dbinfos = pickle.load(f)
     class_names=['Vehicle', 'Pedestrian', 'Cyclist']
-    METHOD='vfh' #vfh, esf, gasd
+    METHOD='grsd' #vfh 96.5, esf 89.1, gasd 82.3
     reject_infinite_normal_objs=False
     random_seed = 42 
+    EXTRACT_ALL_INFOS_FEATS=True
+    EVAL_FEATS=True
+
+
+    CHECK_ROT_TRANS_INVARIANCE=False
+    COMPARE_FEATS=False
+    VISUALIZE_TSNE=False
+    VISUALIZE_FEATS=False
+    CROSS_VAL=False
 
     # ########### check feat robustness
-    # sample=15
-    # class_name = 'Pedestrian'
-    # path = '/home/barza/DepthContrast/data/waymo/' + dbinfos[class_name][sample]['path']
-    # points = np.fromfile(str(path), dtype=np.float32).reshape([-1, 5])
-    # check_feat_robustness(points, METHOD, reject_infinite_normal_objs)
+    if CHECK_ROT_TRANS_INVARIANCE:
+        sample=15
+        class_name = 'Pedestrian'
+        path = ROOT_PATH + dbinfos[class_name][sample]['path']
+        points = np.fromfile(str(path), dtype=np.float32).reshape([-1, 5])
+        check_feat_robustness(points, METHOD, reject_infinite_normal_objs)
 
     # ########### compare feats 
-    # sample=15
-    # obj_class1 = 'Pedestrian'
-    # path = '/home/barza/DepthContrast/data/waymo/' + dbinfos[obj_class1][sample]['path']
-    # points = np.fromfile(str(path), dtype=np.float32).reshape([-1, 5])
-    # obj_points1 = np.fromfile(str(path), dtype=np.float32).reshape([-1, 5])
-    # desc1 = extract_feats(obj_points1[:,:3], method=METHOD, reject_infinite_normal_objs=reject_infinite_normal_objs)
+    if COMPARE_FEATS:
+        sample=15
+        obj_class1 = 'Pedestrian'
+        path = ROOT_PATH + dbinfos[obj_class1][sample]['path']
+        points = np.fromfile(str(path), dtype=np.float32).reshape([-1, 5])
+        obj_points1 = np.fromfile(str(path), dtype=np.float32).reshape([-1, 5])
+        desc1 = extract_feats(obj_points1[:,:3], method=METHOD, reject_infinite_normal_objs=reject_infinite_normal_objs)
 
 
-    # sample=20
-    # obj_class2 = 'Pedestrian'
-    # path = '/home/barza/DepthContrast/data/waymo/' + dbinfos[obj_class2][sample]['path']
-    # obj_points2 = np.fromfile(str(path), dtype=np.float32).reshape([-1, 5])
-    # desc2 = extract_feats(obj_points2[:,:3], method=METHOD, reject_infinite_normal_objs=reject_infinite_normal_objs)
+        sample=20
+        obj_class2 = 'Pedestrian'
+        path = ROOT_PATH + dbinfos[obj_class2][sample]['path']
+        obj_points2 = np.fromfile(str(path), dtype=np.float32).reshape([-1, 5])
+        desc2 = extract_feats(obj_points2[:,:3], method=METHOD, reject_infinite_normal_objs=reject_infinite_normal_objs)
 
-    # plt.plot(desc1, label=obj_class1+'1')
-    # plt.plot(desc2, label=obj_class2+'2')
-    # plt.title(f'Euclidean Distance: {np.linalg.norm(desc1-desc2)}')
-    # plt.legend()
-    # plt.show()
+        plt.plot(desc1, label=obj_class1+'1')
+        plt.plot(desc2, label=obj_class2+'2')
+        plt.title(f'Euclidean Distance: {np.linalg.norm(desc1-desc2)}')
+        plt.legend()
+        plt.show()
     
     ################## Extract feats
-    extract_all_feats(dbinfos, METHOD, reject_infinite_normal_objs, class_names)
+    if EXTRACT_ALL_INFOS_FEATS:
+        extract_all_feats(dbinfos, METHOD, reject_infinite_normal_objs, class_names, ROOT_PATH)
     
     
     # ############ load and visualize tsne
-    # data_dict = pickle.load(open(f"{METHOD}_feats_data_dict.pkl", "rb"))
-    # tsne = pickle.load(open("tsne.pkl", "rb"))
-    # visualize_tsne(data_dict['labels'], tsne, class_names)
+    if VISUALIZE_TSNE:
+        data_dict = pickle.load(open(f"{METHOD}_feats_data_dict.pkl", "rb"))
+        tsne = pickle.load(open("tsne.pkl", "rb"))
+        visualize_tsne(data_dict['labels'], tsne, class_names)
 
     # ############ visualize features
-    # data_dict = pickle.load(open(f"{METHOD}_feats_data_dict.pkl", "rb"))
-    # X = data_dict['feats'] #(nsamples, nfeats)
-    # y = data_dict['labels'] #(nsamples,)
-    # draw_feats(X,y, class_names)
+    if VISUALIZE_FEATS:
+        data_dict = pickle.load(open(f"{METHOD}_feats_data_dict.pkl", "rb"))
+        X = data_dict['feats'] #(nsamples, nfeats)
+        y = data_dict['labels'] #(nsamples,)
+        draw_feats(X,y, class_names)
 
     # ############ classify features
-    data_dict = pickle.load(open(f"{METHOD}_feats_data_dict.pkl", "rb"))
-    X = data_dict['feats'] #(nsamples, nfeats)
-    y = data_dict['labels'] #(nsamples,)
+    if EVAL_FEATS:
+        data_dict = pickle.load(open(f"{METHOD}_feats_data_dict.pkl", "rb"))
+        X = data_dict['feats'] #(nsamples, nfeats)
+        y = data_dict['labels'] #(nsamples,)
+        classifier = svm.SVC(kernel='poly', class_weight='balanced', random_state=random_seed)
+        #classifier = MLPClassifier(hidden_layer_sizes=(128, 128, 3), early_stopping=True, random_state=random_seed)
+        clf = make_pipeline(classifier) #(StandardScaler(), classifier)
 
-    # X_train, X_test, y_train, y_test = [], [], [], []
-    # for class_id in range(len(class_names)):
-    #     name = class_names[class_id]
-    #     X_cls = X[y == class_id]
-    #     y_cls = y[y == class_id]
-    #     X_tr_cls, X_tst_cls, y_tr_cls, y_tst_cls = train_test_split(X_cls, y_cls, test_size=0.33, random_state=42)
-    #     X_train.append(X_tr_cls)
-    #     X_test.append(X_tst_cls)
-    #     y_train.append(y_tr_cls)
-    #     y_test.append(y_tst_cls)
+        if CROSS_VAL:
+            cv_scores = cross_val_score(clf, X, y, cv=5)
+            mean_score = np.mean(cv_scores)
+            print(f'{METHOD} val score: {cv_scores}\t mean score: {mean_score}')
+        else:
+            # cv_scores = cross_val_score(clf, X[y!=0], y[y!=0], cv=5)
+            # mean_score = np.mean(cv_scores)
+            # print(f'{METHOD} val score: {cv_scores}\t mean score: {mean_score}')
 
-    # X_train = np.concatenate(X_train)
-    # X_test = np.concatenate(X_test)
-    # y_train = np.concatenate(y_train)
-    # y_test = np.concatenate(y_test)
-    classifier = svm.SVC(kernel='poly', random_state=random_seed)
-    #classifier = MLPClassifier(hidden_layer_sizes=(128, 128, 3), early_stopping=True, random_state=random_seed)
-    clf = make_pipeline(classifier) #(StandardScaler(), classifier)
-    #clf.fit(X_train, y_train) #'poly', 'rbf' cross_val_score(clf, X, y, cv=5)
-    #score = clf.score(X_test, y_test)
+            X_train, X_test, y_train, y_test = [], [], [], []
+            for class_id in range(len(class_names)):
+                # if class_id == 0:
+                #     continue
+                name = class_names[class_id]
+                X_cls = X[y == class_id]
+                y_cls = y[y == class_id]
+                X_tr_cls, X_tst_cls, y_tr_cls, y_tst_cls = train_test_split(X_cls, y_cls, test_size=0.33, random_state=random_seed)
+                print(f'{name} has {len(X_tr_cls)} train samples, {len(X_tst_cls)} test samples')
+                X_train.append(X_tr_cls)
+                X_test.append(X_tst_cls)
+                y_train.append(y_tr_cls)
+                y_test.append(y_tst_cls)
 
-    cv_scores = cross_val_score(clf, X, y, cv=5)
-    mean_score = np.mean(cv_scores)
-    print(f'{METHOD} val score: {cv_scores}\t mean score: {mean_score}')
+            X_train = np.concatenate(X_train)
+            y_train = np.concatenate(y_train)
+
+            clf.fit(X_train, y_train) #'poly', 'rbf' cross_val_score(clf, X, y, cv=5)
+            s = pickle.dumps(clf)
+            clf2 = pickle.loads(s)
+
+            for class_id in range(len(class_names)):
+                # if class_id == 0:
+                #     continue
+
+                name = class_names[class_id]
+                y_t = y_test[class_id] #-1
+                X_t = X_test[class_id] #-1
+                score = clf.score(X_t, y_t)
+                print(f'{METHOD} val score for {name}:  {score}')
+
+
+        
